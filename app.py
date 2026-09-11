@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import sys
 import threading
 import uuid
 from pathlib import Path
 from shutil import which
-import sys
 from typing import Any
 from urllib.parse import urlparse
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 from yt_dlp import YoutubeDL
+
+try:
+    import imageio_ffmpeg
+except ImportError:
+    imageio_ffmpeg = None
 
 
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -56,8 +61,15 @@ def public_file(file_path: str | None) -> dict[str, str] | None:
     return {"name": path.name, "url": f"/downloads/{path.name}"}
 
 
-def has_ffmpeg() -> bool:
-    return which("ffmpeg") is not None
+def ffmpeg_location() -> str | None:
+    system_ffmpeg = which("ffmpeg")
+    if system_ffmpeg:
+        return system_ffmpeg
+    if imageio_ffmpeg:
+        bundled_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        if bundled_ffmpeg:
+            return bundled_ffmpeg
+    return None
 
 
 def output_file_from_info(ydl: YoutubeDL, info: dict[str, Any], last_file: str | None) -> dict[str, str] | None:
@@ -100,6 +112,7 @@ def download_video(job_id: str, url: str, audio_only: bool) -> None:
         elif data["status"] == "finished":
             job_update(job_id, status="processing", percent=100)
 
+    ffmpeg = ffmpeg_location()
     ydl_opts: dict[str, Any] = {
         "outtmpl": str(DOWNLOAD_DIR / "%(title).180B [%(id)s].%(ext)s"),
         "progress_hooks": [progress_hook],
@@ -108,25 +121,23 @@ def download_video(job_id: str, url: str, audio_only: bool) -> None:
         "no_warnings": True,
         "windowsfilenames": True,
     }
+    if ffmpeg:
+        ydl_opts["ffmpeg_location"] = ffmpeg
 
     if audio_only:
         ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
     else:
-        if has_ffmpeg():
-            ydl_opts["format"] = (
-                "bv*[ext=mp4]+ba[ext=m4a]/"
-                "bv*[ext=webm]+ba[ext=webm]/"
-                "bv*+ba/"
-                "best[ext=mp4]/"
-                "best"
-            )
-        else:
-            # Without ffmpeg, yt-dlp cannot merge separate video/audio streams.
-            ydl_opts["format"] = "best[ext=mp4]/best/bv*[ext=mp4]/bv*"
-            job_update(
-                job_id,
-                warning="ffmpeg がないため、動画によっては音声なしで保存されます。",
-            )
+        if not ffmpeg:
+            job_update(job_id, status="error", error="ffmpeg が見つからないため、音声付き動画を作成できません。")
+            return
+        ydl_opts["format"] = (
+            "bv*[ext=mp4][height<=1080]+ba[ext=m4a]/"
+            "bv*[ext=webm][height<=1080]+ba[ext=webm]/"
+            "bv*[height<=1080]+ba/"
+            "bv*+ba/"
+            "best[ext=mp4]/"
+            "best"
+        )
 
     try:
         job_update(job_id, status="starting", percent=0)
