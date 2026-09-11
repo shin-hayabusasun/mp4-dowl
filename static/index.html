@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Downloader</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <div class="header">
+          <div>
+            <p class="eyebrow">Local downloader</p>
+            <h1>YouTube Downloader</h1>
+          </div>
+          <button id="refreshFiles" class="icon-button" title="一覧を更新" aria-label="一覧を更新">↻</button>
+        </div>
+
+        <form id="downloadForm" class="form">
+          <label for="url">YouTube URL</label>
+          <div class="url-row">
+            <input id="url" name="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required />
+            <button type="button" id="previewButton">確認</button>
+            <button type="submit" id="downloadButton">保存</button>
+          </div>
+          <label class="check-row">
+            <input id="audioOnly" type="checkbox" />
+            <span>音声だけ保存する</span>
+          </label>
+          <p class="notice">自分が権利を持つ動画、または権利者から保存を許可された動画だけに使用してください。</p>
+        </form>
+
+        <section id="preview" class="preview hidden" aria-live="polite"></section>
+
+        <section class="progress-block">
+          <div class="progress-meta">
+            <span id="statusText">待機中</span>
+            <span id="percentText">0%</span>
+          </div>
+          <div class="progress-bar" aria-hidden="true">
+            <div id="progressFill"></div>
+          </div>
+          <a id="resultLink" class="result-link hidden" href="#">ダウンロードしたファイルを保存</a>
+        </section>
+      </section>
+
+      <aside class="files-panel">
+        <h2>保存済みファイル</h2>
+        <div id="files" class="files"></div>
+      </aside>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
