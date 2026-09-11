@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import threading
 import uuid
 from pathlib import Path
@@ -62,13 +63,38 @@ def public_file(file_path: str | None) -> dict[str, str] | None:
 
 
 def ffmpeg_location() -> str | None:
+    def modified_time(path: Path) -> float:
+        try:
+            return path.stat().st_mtime
+        except OSError:
+            return 0
+
+    candidates = [
+        APP_DIR / "ffmpeg.exe",
+        RESOURCE_DIR / "ffmpeg.exe",
+    ]
+    candidates.extend(RESOURCE_DIR.rglob("ffmpeg*.exe"))
+    mei_dirs = sorted(Path(tempfile.gettempdir()).glob("_MEI*"), key=modified_time, reverse=True)
+    for mei_dir in mei_dirs:
+        if mei_dir.is_dir():
+            candidates.extend(mei_dir.rglob("ffmpeg*.exe"))
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+
     system_ffmpeg = which("ffmpeg")
     if system_ffmpeg:
         return system_ffmpeg
+
     if imageio_ffmpeg:
-        bundled_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-        if bundled_ffmpeg:
+        try:
+            bundled_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            bundled_ffmpeg = None
+        if bundled_ffmpeg and Path(bundled_ffmpeg).is_file():
             return bundled_ffmpeg
+
     return None
 
 
